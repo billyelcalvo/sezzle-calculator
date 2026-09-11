@@ -1,0 +1,71 @@
+# Frontend / Node
+node_modules/
+/frontend/dist/
+/frontend/dist-ssr/
+.vite/
+.vite-temp/
+.vitest/
+*.tsbuildinfo
+
+# Go
+# Salidas locales de compilación; para otros nombres, usar backend/bin/.
+/backend/bin/
+/backend/sezzle-calculator
+/backend/main
+*.exe
+*.test
+*.prof
+*.pprof
+
+# Environment
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Coverage
+coverage/
+.nyc_output/
+coverage.out
+coverage.txt
+coverage.html
+coverage.xml
+lcov.info
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# IDEs
+# Mantener disponibles ajustes, tareas, depuración y extensiones compartidas.
+**/.vscode/*
+!**/.vscode/settings.json
+!**/.vscode/tasks.json
+!**/.vscode/launch.json
+!**/.vscode/extensions.json
+!**/.vscode/*.code-snippets
+**/.idea/workspace.xml
+**/.idea/tasks.xml
+**/.idea/usage.statistics.xml
+**/.idea/shelf/
+**/.idea/httpRequests/
+.history/
+*.suo
+
+# OS files
+.DS_Store
+._*
+.AppleDouble/
+.LSOverride
+Thumbs.db
+Thumbs.db:encryptable
+Desktop.ini
+$RECYCLE.BIN/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
