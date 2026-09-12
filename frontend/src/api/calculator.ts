@@ -5,7 +5,7 @@ export async function calculate(input: CalculateRequest): Promise<number> {
   const operands = input.operation === 'sqrt' ? [input.a] : [input.a, input.b]
   if (!operands.every(Number.isFinite)) throw new Error('Ingresa números válidos.')
   let response: Response
-  try { response = await fetch('http://localhost:8080/api/calculate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }) }
+  try { response = await fetch(import.meta.env.VITE_API_URL ?? 'http://localhost:8080/api/calculate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }) }
   catch { throw new Error('No se pudo conectar con el servidor.') }
   if (!(response.headers.get('content-type') ?? '').includes('application/json')) throw new Error(`Respuesta inesperada del servidor (${response.status}).`)
   const data = await response.json() as ResponseData
