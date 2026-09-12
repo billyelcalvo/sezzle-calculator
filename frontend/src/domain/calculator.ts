@@ -1,6 +1,9 @@
 export type Operation = 'add' | 'subtract' | 'multiply' | 'divide' | 'power' | 'sqrt' | 'percentage'
+
 export type CalculateRequest = { operation: 'sqrt'; a: number } | { operation: Exclude<Operation, 'sqrt'>; a: number; b: number }
+
 export type OperationOption = { value: Operation; label: string; symbol: string; unary: boolean }
+
 export const operationOptions: OperationOption[] = [
   { value: 'add', label: 'Suma', symbol: '+', unary: false }, { value: 'subtract', label: 'Resta', symbol: '−', unary: false }, { value: 'multiply', label: 'Multiplicación', symbol: '×', unary: false }, { value: 'divide', label: 'División', symbol: '÷', unary: false }, { value: 'power', label: 'Potencia', symbol: '^', unary: false }, { value: 'sqrt', label: 'Raíz cuadrada', symbol: '√', unary: true }, { value: 'percentage', label: 'Porcentaje', symbol: '%', unary: false },
 ]
