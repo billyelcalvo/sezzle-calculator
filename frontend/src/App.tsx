@@ -1,9 +1,4 @@
-function App() {
-  return (
-    <main>
-      <h1>Calculadora</h1>
-    </main>
-  )
-}
+import Calculator from './components/Calculator'
+function App() { return <Calculator /> }
 
 export default App
