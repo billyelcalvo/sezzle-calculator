@@ -97,8 +97,8 @@ func TestCORSRouter(tester *testing.T) {
 		expectedBody string
 	}{
 		{name: "success", method: http.MethodPost, path: "/api/calculate", body: `{"operation":"add","a":10,"b":5}`, status: http.StatusOK, expectedBody: `{"result":15}`},
-		{name: "invalid JSON", method: http.MethodPost, path: "/api/calculate", body: `{`, status: http.StatusBadRequest, expectedBody: `{"error":"body must be a valid JSON object with operation, a and b"}`},
-		{name: "division by zero", method: http.MethodPost, path: "/api/calculate", body: `{"operation":"divide","a":10,"b":0}`, status: http.StatusUnprocessableEntity, expectedBody: `{"error":"division by zero"}`},
+		{name: "invalid JSON", method: http.MethodPost, path: "/api/calculate", body: `{`, status: http.StatusBadRequest, expectedBody: `{"error":"body must be a valid JSON object with valid fields and types"}`},
+		{name: "division by zero", method: http.MethodPost, path: "/api/calculate", body: `{"operation":"divide","a":10,"b":0}`, status: http.StatusBadRequest, expectedBody: `{"error":"division by zero"}`},
 		{name: "unsupported method", method: http.MethodGet, path: "/api/calculate", status: http.StatusMethodNotAllowed, expectedBody: `{"error":"method must be POST"}`},
 		{name: "unknown route", method: http.MethodPost, path: "/missing", status: http.StatusNotFound, expectedBody: "404 page not found"},
 		{name: "preflight", method: http.MethodOptions, path: "/api/calculate", status: http.StatusNoContent},

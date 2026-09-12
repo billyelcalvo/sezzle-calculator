@@ -43,7 +43,7 @@ func Calculate(writer http.ResponseWriter, request *http.Request) {
 	decoder := json.NewDecoder(request.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&input); err != nil {
-		writeJSON(writer, http.StatusBadRequest, errorResponse{Error: "body must be a valid JSON object with operation, a and b"})
+		writeJSON(writer, http.StatusBadRequest, errorResponse{Error: "body must be a valid JSON object with valid fields and types"})
 		return
 	}
 	if err := decoder.Decode(new(any)); err != io.EOF {
@@ -55,8 +55,12 @@ func Calculate(writer http.ResponseWriter, request *http.Request) {
 		writeJSON(writer, http.StatusBadRequest, errorResponse{Error: "operation is required"})
 		return
 	}
-	if input.OperandA == nil || input.OperandB == nil {
-		writeJSON(writer, http.StatusBadRequest, errorResponse{Error: "a and b are required numbers"})
+	if input.OperandA == nil {
+		writeJSON(writer, http.StatusBadRequest, errorResponse{Error: "a is a required number"})
+		return
+	}
+	if input.Operation != "sqrt" && input.OperandB == nil {
+		writeJSON(writer, http.StatusBadRequest, errorResponse{Error: "b is a required number for this operation"})
 		return
 	}
 
@@ -70,13 +74,21 @@ func Calculate(writer http.ResponseWriter, request *http.Request) {
 		result = calculator.Multiply(*input.OperandA, *input.OperandB)
 	case "divide":
 		result, err = calculator.Divide(*input.OperandA, *input.OperandB)
+	case "power":
+		result, err = calculator.Power(*input.OperandA, *input.OperandB)
+	case "sqrt":
+		result, err = calculator.SquareRoot(*input.OperandA)
+	case "percentage":
+		result = calculator.Percentage(*input.OperandA, *input.OperandB)
 	default:
-		writeJSON(writer, http.StatusBadRequest, errorResponse{Error: "operation must be add, subtract, multiply or divide"})
+		writeJSON(writer, http.StatusBadRequest, errorResponse{Error: "operation must be add, subtract, multiply, divide, power, sqrt or percentage"})
 		return
 	}
 
-	if errors.Is(err, calculator.ErrDivisionByZero) {
-		writeJSON(writer, http.StatusUnprocessableEntity, errorResponse{Error: "division by zero"})
+	if errors.Is(err, calculator.ErrDivisionByZero) ||
+		errors.Is(err, calculator.ErrNegativeSquareRoot) ||
+		errors.Is(err, calculator.ErrInvalidPower) {
+		writeJSON(writer, http.StatusBadRequest, errorResponse{Error: err.Error()})
 		return
 	}
 	if err != nil {
@@ -84,7 +96,7 @@ func Calculate(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 	if math.IsNaN(result) || math.IsInf(result, 0) {
-		writeJSON(writer, http.StatusUnprocessableEntity, errorResponse{Error: "result is outside the supported numeric range"})
+		writeJSON(writer, http.StatusBadRequest, errorResponse{Error: "result is outside the supported numeric range"})
 		return
 	}
 

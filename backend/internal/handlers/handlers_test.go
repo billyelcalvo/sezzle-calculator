@@ -3,6 +3,7 @@ package handlers_test
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"net/http"
@@ -24,6 +25,16 @@ func TestCalculateSuccess(tester *testing.T) {
 		{name: "subtraction", body: `{"operation":"subtract","a":5,"b":10}`, expected: -5},
 		{name: "multiplication", body: `{"operation":"multiply","a":-10,"b":5}`, expected: -50},
 		{name: "division", body: `{"operation":"divide","a":5,"b":2}`, expected: 2.5},
+		{name: "power", body: `{"operation":"power","a":2,"b":3}`, expected: 8},
+		{name: "zero exponent", body: `{"operation":"power","a":5,"b":0}`, expected: 1},
+		{name: "negative exponent", body: `{"operation":"power","a":2,"b":-3}`, expected: 0.125},
+		{name: "square root without b", body: `{"operation":"sqrt","a":25}`, expected: 5},
+		{name: "square root of zero", body: `{"operation":"sqrt","a":0}`, expected: 0},
+		{name: "square root with null b", body: `{"operation":"sqrt","a":25,"b":null}`, expected: 5},
+		{name: "square root ignores b", body: `{"operation":"sqrt","a":25,"b":100}`, expected: 5},
+		{name: "percentage", body: `{"operation":"percentage","a":20,"b":150}`, expected: 30},
+		{name: "zero percent", body: `{"operation":"percentage","a":0,"b":150}`, expected: 0},
+		{name: "percentage of zero", body: `{"operation":"percentage","a":20,"b":0}`, expected: 0},
 		{name: "decimals", body: `{"operation":"add","a":0.1,"b":0.2}`, expected: 0.3},
 		{name: "zero operands", body: `{"operation":"add","a":0,"b":0}`, expected: 0},
 		{name: "zero dividend", body: `{"operation":"divide","a":0,"b":5}`, expected: 0},
@@ -77,7 +88,7 @@ func TestCalculateInvalidInput(tester *testing.T) {
 		{name: "empty operation", body: `{"operation":"","a":10,"b":5}`, status: http.StatusBadRequest},
 		{name: "null operation", body: `{"operation":null,"a":10,"b":5}`, status: http.StatusBadRequest},
 		{name: "non-string operation", body: `{"operation":1,"a":10,"b":5}`, status: http.StatusBadRequest},
-		{name: "unsupported operation", body: `{"operation":"power","a":10,"b":5}`, status: http.StatusBadRequest},
+		{name: "unsupported operation", body: `{"operation":"modulo","a":10,"b":5}`, status: http.StatusBadRequest},
 		{name: "uppercase operation", body: `{"operation":"ADD","a":10,"b":5}`, status: http.StatusBadRequest},
 		{name: "blank operation", body: `{"operation":" ","a":10,"b":5}`, status: http.StatusBadRequest},
 		{name: "missing a", body: `{"operation":"add","b":5}`, status: http.StatusBadRequest},
@@ -92,13 +103,21 @@ func TestCalculateInvalidInput(tester *testing.T) {
 		{name: "infinite operand", body: `{"operation":"add","a":10,"b":Infinity}`, status: http.StatusBadRequest},
 		{name: "operand overflow", body: `{"operation":"add","a":1e400,"b":5}`, status: http.StatusBadRequest},
 		{name: "second operand overflow", body: `{"operation":"add","a":10,"b":-1e400}`, status: http.StatusBadRequest},
-		{name: "division by zero", body: `{"operation":"divide","a":10,"b":0}`, status: http.StatusUnprocessableEntity},
-		{name: "zero divided by zero", body: `{"operation":"divide","a":0,"b":0}`, status: http.StatusUnprocessableEntity},
-		{name: "division by negative zero", body: `{"operation":"divide","a":10,"b":-0}`, status: http.StatusUnprocessableEntity},
-		{name: "result overflow", body: `{"operation":"multiply","a":1e308,"b":10}`, status: http.StatusUnprocessableEntity},
-		{name: "addition overflow", body: `{"operation":"add","a":1e308,"b":1e308}`, status: http.StatusUnprocessableEntity},
-		{name: "subtraction overflow", body: `{"operation":"subtract","a":-1e308,"b":1e308}`, status: http.StatusUnprocessableEntity},
-		{name: "division overflow", body: `{"operation":"divide","a":1e308,"b":1e-308}`, status: http.StatusUnprocessableEntity},
+		{name: "division by zero", body: `{"operation":"divide","a":10,"b":0}`, status: http.StatusBadRequest},
+		{name: "zero divided by zero", body: `{"operation":"divide","a":0,"b":0}`, status: http.StatusBadRequest},
+		{name: "division by negative zero", body: `{"operation":"divide","a":10,"b":-0}`, status: http.StatusBadRequest},
+		{name: "result overflow", body: `{"operation":"multiply","a":1e308,"b":10}`, status: http.StatusBadRequest},
+		{name: "addition overflow", body: `{"operation":"add","a":1e308,"b":1e308}`, status: http.StatusBadRequest},
+		{name: "subtraction overflow", body: `{"operation":"subtract","a":-1e308,"b":1e308}`, status: http.StatusBadRequest},
+		{name: "division overflow", body: `{"operation":"divide","a":1e308,"b":1e-308}`, status: http.StatusBadRequest},
+		{name: "negative square root", body: `{"operation":"sqrt","a":-1}`, status: http.StatusBadRequest},
+		{name: "square root missing a", body: `{"operation":"sqrt"}`, status: http.StatusBadRequest},
+		{name: "square root null a", body: `{"operation":"sqrt","a":null}`, status: http.StatusBadRequest},
+		{name: "square root invalid b type", body: `{"operation":"sqrt","a":25,"b":"unused"}`, status: http.StatusBadRequest},
+		{name: "non-real power", body: `{"operation":"power","a":-2,"b":0.5}`, status: http.StatusBadRequest},
+		{name: "zero with negative exponent", body: `{"operation":"power","a":0,"b":-1}`, status: http.StatusBadRequest},
+		{name: "power overflow", body: `{"operation":"power","a":1e308,"b":2}`, status: http.StatusBadRequest},
+		{name: "percentage overflow", body: `{"operation":"percentage","a":1e308,"b":1e308}`, status: http.StatusBadRequest},
 	}
 
 	for _, test := range tests {
@@ -111,6 +130,32 @@ func TestCalculateInvalidInput(tester *testing.T) {
 
 			checkJSONResponse(tester, recorder, test.status)
 		})
+	}
+}
+
+func TestCalculateRequiredBinaryOperands(tester *testing.T) {
+	inputs := []struct {
+		name   string
+		fields string
+	}{
+		{name: "missing a", fields: `"b":5`},
+		{name: "missing b", fields: `"a":10`},
+		{name: "null a", fields: `"a":null,"b":5`},
+		{name: "null b", fields: `"a":10,"b":null`},
+	}
+	for _, operation := range []string{"add", "subtract", "multiply", "divide", "power", "percentage"} {
+		for _, input := range inputs {
+			tester.Run(operation+"/"+input.name, func(tester *testing.T) {
+				body := fmt.Sprintf(`{"operation":%q,%s}`, operation, input.fields)
+				request := httptest.NewRequest(http.MethodPost, "/api/calculate", strings.NewReader(body))
+				request.Header.Set("Content-Type", "application/json")
+				recorder := httptest.NewRecorder()
+
+				handlers.Calculate(recorder, request)
+
+				checkJSONResponse(tester, recorder, http.StatusBadRequest)
+			})
+		}
 	}
 }
 
@@ -171,13 +216,16 @@ func TestCalculateErrorMessages(tester *testing.T) {
 		status  int
 		message string
 	}{
-		{name: "invalid JSON", body: `{`, status: http.StatusBadRequest, message: "body must be a valid JSON object with operation, a and b"},
+		{name: "invalid JSON", body: `{`, status: http.StatusBadRequest, message: "body must be a valid JSON object with valid fields and types"},
 		{name: "multiple objects", body: `{} {}`, status: http.StatusBadRequest, message: "body must contain exactly one JSON object"},
 		{name: "missing operation", body: `{"a":10,"b":5}`, status: http.StatusBadRequest, message: "operation is required"},
-		{name: "missing operand", body: `{"operation":"add","a":10}`, status: http.StatusBadRequest, message: "a and b are required numbers"},
-		{name: "invalid operation", body: `{"operation":"power","a":10,"b":5}`, status: http.StatusBadRequest, message: "operation must be add, subtract, multiply or divide"},
-		{name: "division by zero", body: `{"operation":"divide","a":10,"b":0}`, status: http.StatusUnprocessableEntity, message: "division by zero"},
-		{name: "overflow", body: `{"operation":"multiply","a":1e308,"b":10}`, status: http.StatusUnprocessableEntity, message: "result is outside the supported numeric range"},
+		{name: "missing operand", body: `{"operation":"add","a":10}`, status: http.StatusBadRequest, message: "b is a required number for this operation"},
+		{name: "missing square root operand", body: `{"operation":"sqrt"}`, status: http.StatusBadRequest, message: "a is a required number"},
+		{name: "invalid operation", body: `{"operation":"modulo","a":10,"b":5}`, status: http.StatusBadRequest, message: "operation must be add, subtract, multiply, divide, power, sqrt or percentage"},
+		{name: "division by zero", body: `{"operation":"divide","a":10,"b":0}`, status: http.StatusBadRequest, message: "division by zero"},
+		{name: "negative square root", body: `{"operation":"sqrt","a":-1}`, status: http.StatusBadRequest, message: "cannot calculate square root of a negative number"},
+		{name: "non-real power", body: `{"operation":"power","a":-2,"b":0.5}`, status: http.StatusBadRequest, message: "power result is not a finite real number"},
+		{name: "overflow", body: `{"operation":"multiply","a":1e308,"b":10}`, status: http.StatusBadRequest, message: "result is outside the supported numeric range"},
 	}
 
 	for _, test := range tests {
@@ -235,6 +283,12 @@ func FuzzCalculateJSON(fuzzer *testing.F) {
 		`{"operation":"divide","a":10,"b":0}`,
 		`{"operation":"divide","a":10,"b":2}`,
 		`{"operation":"add","a":null,"b":5}`,
+		`{"operation":"power","a":2,"b":-3}`,
+		`{"operation":"power","a":-2,"b":0.5}`,
+		`{"operation":"sqrt","a":25}`,
+		`{"operation":"sqrt","a":-1}`,
+		`{"operation":"sqrt","a":0}`,
+		`{"operation":"percentage","a":20,"b":150}`,
 		`{} {}`,
 		`null`,
 		`[]`,
@@ -251,7 +305,7 @@ func FuzzCalculateJSON(fuzzer *testing.F) {
 		handlers.Calculate(recorder, request)
 
 		switch recorder.Code {
-		case http.StatusOK, http.StatusBadRequest, http.StatusUnprocessableEntity:
+		case http.StatusOK, http.StatusBadRequest:
 		default:
 			tester.Fatalf("unexpected status %d for body %q", recorder.Code, body)
 		}
